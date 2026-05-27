@@ -285,7 +285,7 @@ def run_cogni_core():
                     res = requests.get(fallback_url, timeout=15)
                     ai_response = res.text
                 except Exception as e:
-                    ai_response = f"⚠️ Safe Network Connection Exception: The school firewall is actively filtering cloud endpoints. {settingvar}"
+                    ai_response = f"⚠️ Safe Network Connection Exception: The school firewall is actively filtering cloud endpoints."
 
         # Commit updates
         st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
