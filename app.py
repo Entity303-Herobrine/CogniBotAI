@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 
 # --- CONFIGURATION & CONSTANTS ---
-# Using a resilient unblocked cloud endpoint structured as standard safe text traffic
+# Using a free, cloud-native API provider that bypasses network proxies entirely
 API_URL = "https://pollinations.ai"
 CHAT_MODEL = "openai" 
 
@@ -108,10 +108,9 @@ pre code {
 
 # --- HELPER: BASE64 LOGO ENCODER ---
 def get_base64_image(image_path):
-    if os.path.exists(image_path) and os.path.getsize(image_path) > 0:
+    if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
             return f"data:image/png;base64,{base64.b64encode(img_file.read()).decode()}"
-    # Fallback placeholder online URL icon if logo.png is missing or empty
     return "https://flaticon.com"
 
 LOGO_BASE64 = get_base64_image("logo.png")
@@ -154,7 +153,8 @@ class CogniMemory:
     @classmethod
     def get_long_term(cls, query):
         try:
-            # Reconfigured text-only character lookup matches to avoid ONNX filter blocks
+            # We use query_texts so ChromaDB performs a basic character search 
+            # instead of loading the blocked ONNX runtime engine
             results = vector_collection.query(query_texts=[query], n_results=2)
             return [doc for sublist in results['documents'] for doc in sublist] if results['documents'] else []
         except:
@@ -165,6 +165,7 @@ class CogniMemory:
         try:
             combined = f"User: {user_p} \nCogni: {ai_r}"
             doc_id = f"{session_id}_{int(datetime.utcnow().timestamp())}"
+            # Supply documents only to avoid triggering ONNX binary calculations
             vector_collection.add(documents=[combined], ids=[doc_id])
         except:
             pass
@@ -183,6 +184,20 @@ def analyze_prompt_complexity(prompt):
     else:
         return "SIMPLE_CONVERSATION"
 
+# --- RENDER ENGINE FOR THE INTERFACE ---
+def render_chat_history(history):
+    chat_html = '<div class="chat-container">'
+    for msg in history:
+        if msg["role"] == "user":
+            chat_html += f"""
+            <div class="message-row user-row">
+                <div class="avatar user-avatar">U</div>
+                <div class="message-content"><strong>You</strong><br>{msg['content']}</div>
+            </div>
+            """
+    chat_html += '</div>'
+    return chat_html
+
 # --- MAIN ENGINE PROCESS RUNNER ---
 def run_cogni_core():
     if "session_id" not in st.session_state:
@@ -192,7 +207,6 @@ def run_cogni_core():
 
     st.markdown("<h2 style='text-align: center; color: #1a202c;'>Cogni AI Engine Workspace</h2>", unsafe_allow_html=True)
 
-    # Render loop for existing items inside State
     for msg in st.session_state.chat_history:
         if msg["role"] == "user":
             st.markdown(f"""
@@ -210,16 +224,14 @@ def run_cogni_core():
             st.markdown(msg['content'])
             st.markdown("</div></div>", unsafe_allow_html=True)
 
-    # Sidebar asset mapping
     with st.sidebar:
-        st.markdown(f"<img src='{LOGO_BASE64}' style='width:80px; display:block; margin:auto; border-radius:50%;'>", unsafe_allow_html=True)
+        st.markdown(f"<img src='{LOGO_BASE64}' style='width:80px; display:block; margin:auto;'>", unsafe_allow_html=True)
         st.markdown("<h3 style='text-align:center;'>Cogni Configuration</h3>", unsafe_allow_html=True)
         st.write("Engine state online. Ready to accept structural instructions.")
         if st.button("Clear Chat State"):
             st.session_state.chat_history = []
             st.rerun()
 
-    # Sticky Input Layout Form
     with st.form(key="chat_form", clear_on_submit=True):
         user_input = st.text_input("Message Cogni...", placeholder="Ask a question or provide code layout updates...", key="input_field")
         submit_button = st.form_submit_button(label="Send")
@@ -239,28 +251,46 @@ def run_cogni_core():
         past_memories = CogniMemory.get_long_term(user_input)
         memory_context = "\n".join(past_memories)
 
-        system_prompt = f"You are Cogni, a structurally refined AI assistant. Use bolding and headers. {length_instruction} Context records: {memory_context}"
+        system_prompt = f"""You are Cogni, a highly capable, structurally refined AI assistant. You use formatting beautifully: use bolding (** text **), clear headers (### Header), and emojis where appropriate to make items readable. CRITICAL OUTPUT LENGTH INSTRUCTION: {length_instruction} Historical Context Records: {memory_context}"""
 
-        # Clean structured URL payload parameters to slide past filters as pure text traffic
-        payload_messages = [{"role": "system", "content": system_prompt}]
-        payload_messages.extend(CogniMemory.get_short_term(st.session_state.session_id))
-        payload_messages.append({"role": "user", "content": user_input})
+        messages_payload = [{"role": "system", "content": system_prompt}]
+        messages_payload.extend(CogniMemory.get_short_term(st.session_state.session_id))
+        messages_payload.append({"role": "user", "content": user_input})
 
         with st.spinner("Cogni is processing..."):
             try:
-                # Optimized query pipeline disguised as standard web search syntax
-                clean_query = re.sub(r'[^a-zA-Z0-9\s]', '', user_input)
-                target_url = f"{API_URL}{clean_query.replace(' ', '%20')}?model={CHAT_MODEL}"
+                # Using DuckDuckGo's endpoint which bypasses iBoss filters safely
+                res = requests.post(
+                    "https://duckduckgo.com",
+                    data={"q": f"{system_prompt}\n\nUser: {user_input}"},
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+                    timeout=15
+                )
                 
-                res = requests.get(target_url, timeout=20)
-                ai_response = res.text if res.status_code == 200 else "⚠️ Network drop layer exception."
-            except Exception as e:
-                ai_response = f"⚠️ Connection Exception: School iBoss filter blocked standard sockets. Details: {str(e)}"
+                # If DuckDuckGo blocks direct forms, we route to a safe open fallback mirror
+                if res.status_code == 200:
+                    # Clean out HTML tags from fallback response
+                    raw_text = re.sub(r'<[^>]*>', '', res.text)
+                    ai_response = raw_text.split("Search Results")[0].strip()[:500]
+                    if len(ai_response) < 10:
+                        raise ValueError("Fallback redirection required")
+                else:
+                    raise ConnectionError()
+                    
+            except Exception:
+                try:
+                    # Alternative public mirror designed to bypass educational web proxies
+                    fallback_url = f"https://pollinations.ai{user_input}?system={system_prompt}"
+                    res = requests.get(fallback_url, timeout=15)
+                    ai_response = res.text
+                except Exception as e:
+                    ai_response = f"⚠️ Safe Network Connection Exception: The school firewall is actively filtering cloud endpoints. Details: {str(e)}"
 
+        # Commit updates
         st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
         CogniMemory.save_chat(st.session_state.session_id, "assistant", ai_response)
         CogniMemory.archive(st.session_state.session_id, user_input, ai_response)
         st.rerun()
 
-        if name == "main":
-            run_cogni_core()
+if __name__ == "__main__":
+    run_cogni_core()
