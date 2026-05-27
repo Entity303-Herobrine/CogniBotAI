@@ -227,8 +227,8 @@ def run_cogni_core():
 
     with st.sidebar:
         st.markdown(f"<img src='{LOGO_BASE64}' style='width:80px; display:block; margin:auto;'>", unsafe_allow_html=True)
-        st.markdown("<h3 style='text-align:center;'>Cogni Configuration</h3>", unsafe_allow_html=True)
-        st.write("Engine state online. Ready to accept structural instructions.")
+        st.markdown("<h3 style='text-align:center;'>Cogni AI</h3>", unsafe_allow_html=True)
+        st.write("Cogni is designed to be an AI that can  bypass school filters.")
         if st.button("Clear Chat State"):
             st.session_state.chat_history = []
             st.rerun()
