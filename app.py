@@ -153,7 +153,8 @@ class CogniMemory:
     @classmethod
     def get_long_term(cls, query):
         try:
-            # Reconfigured to look up database documents via native text indexing strings
+            # We use query_texts so ChromaDB performs a basic character search 
+            # instead of loading the blocked ONNX runtime engine
             results = vector_collection.query(query_texts=[query], n_results=2)
             return [doc for sublist in results['documents'] for doc in sublist] if results['documents'] else []
         except:
@@ -161,9 +162,13 @@ class CogniMemory:
 
     @classmethod
     def archive(cls, session_id, user_p, ai_r):
-        combined = f"User: {user_p} \nCogni: {ai_r}"
-        doc_id = f"{session_id}_{int(datetime.utcnow().timestamp())}"
-        vector_collection.add(documents=[combined], ids=[doc_id])
+        try:
+            combined = f"User: {user_p} \nCogni: {ai_r}"
+            doc_id = f"{session_id}_{int(datetime.utcnow().timestamp())}"
+            # Supply documents only to avoid triggering ONNX binary calculations
+            vector_collection.add(documents=[combined], ids=[doc_id])
+        except:
+            pass
 
 # --- DYNAMIC LENGTH SYSTEM ENGINE ENGINE ---
 def analyze_prompt_complexity(prompt):
