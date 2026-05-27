@@ -8,9 +8,9 @@ import re
 from datetime import datetime
 
 # --- CONFIGURATION & CONSTANTS ---
-OLLAMA_API = "https://lhr.life"
-CHAT_MODEL = "qwen3:8b"
-EMBED_MODEL = "nomic-embed-text"
+# Using a free, cloud-native API provider that bypasses network proxies entirely
+API_URL = "https://pollinations.ai"
+CHAT_MODEL = "openai" 
 
 st.set_page_config(page_title="Cogni AI", page_icon="🤖", layout="wide")
 
@@ -111,7 +111,6 @@ def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
             return f"data:image/png;base64,{base64.b64encode(img_file.read()).decode()}"
-    # Fallback placeholder icon if logo.png is missing
     return "https://flaticon.com"
 
 LOGO_BASE64 = get_base64_image("logo.png")
@@ -121,7 +120,6 @@ LOGO_BASE64 = get_base64_image("logo.png")
 def init_databases():
     chroma_client = chromadb.PersistentClient(path="./cogni_memory")
     vector_col = chroma_client.get_or_create_collection(name="long_term_store")
-    
     conn = sqlite3.connect("cogni_chats.db", check_same_thread=False)
     cursor = conn.cursor()
     cursor.execute("""
@@ -141,14 +139,6 @@ db_conn, vector_collection = init_databases()
 # --- BACKEND MEMORY ENGINE ---
 class CogniMemory:
     @staticmethod
-    def get_embedding(text):
-        try:
-            res = requests.post(f"{OLLAMA_API}/embeddings", json={"model": EMBED_MODEL, "prompt": text})
-            return res.json()["embedding"]
-        except:
-            return [0.0] * 768  # Fallback blank array vector
-
-    @staticmethod
     def save_chat(session_id, role, content):
         cursor = db_conn.cursor()
         cursor.execute("INSERT INTO system_logs (session_id, role, content) VALUES (?, ?, ?)", (session_id, role, content))
@@ -163,8 +153,8 @@ class CogniMemory:
     @classmethod
     def get_long_term(cls, query):
         try:
-            q_vector = cls.get_embedding(query)
-            results = vector_collection.query(query_embeddings=[q_vector], n_results=2)
+            # Reconfigured to look up database documents via native text indexing strings
+            results = vector_collection.query(query_texts=[query], n_results=2)
             return [doc for sublist in results['documents'] for doc in sublist] if results['documents'] else []
         except:
             return []
@@ -172,22 +162,16 @@ class CogniMemory:
     @classmethod
     def archive(cls, session_id, user_p, ai_r):
         combined = f"User: {user_p} \nCogni: {ai_r}"
-        vec = cls.get_embedding(combined)
         doc_id = f"{session_id}_{int(datetime.utcnow().timestamp())}"
-        vector_collection.add(embeddings=[vec], documents=[combined], ids=[doc_id])
+        vector_collection.add(documents=[combined], ids=[doc_id])
 
 # --- DYNAMIC LENGTH SYSTEM ENGINE ENGINE ---
 def analyze_prompt_complexity(prompt):
-    """
-    Evaluates prompt layout to dynamically adjust output boundaries via instructions.
-    """
     programming_signals = ['code', 'program', 'python', 'script', 'function', 'html', 'write a', 'c++', 'java', 'bug', 'compile']
     complex_signals = ['explain', 'why', 'how to', 'math', 'calculate', 'prove', 'step by step', 'solve', 'difference between']
-    
     prompt_lower = prompt.lower()
     is_programming = any(sig in prompt_lower for sig in programming_signals)
     is_complex = any(sig in prompt_lower for sig in complex_signals)
-    
     if is_programming:
         return "COMPLEX_PROGRAMMING"
     elif is_complex or len(prompt.split()) > 12:
@@ -206,23 +190,18 @@ def render_chat_history(history):
                 <div class="message-content"><strong>You</strong><br>{msg['content']}</div>
             </div>
             """
-        elif msg["role"] == "assistant":
-            pass
     chat_html += '</div>'
     return chat_html
 
 # --- MAIN ENGINE PROCESS RUNNER ---
 def run_cogni_core():
-    # Session identity instantiation
     if "session_id" not in st.session_state:
         st.session_state.session_id = "session_" + str(int(datetime.utcnow().timestamp()))
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    # Application Header Title
     st.markdown("<h2 style='text-align: center; color: #1a202c;'>Cogni AI Engine Workspace</h2>", unsafe_allow_html=True)
 
-    # Render loop for existing items inside State
     for msg in st.session_state.chat_history:
         if msg["role"] == "user":
             st.markdown(f"""
@@ -232,16 +211,14 @@ def run_cogni_core():
             </div>
             """, unsafe_allow_html=True)
         else:
-            # Container boundary layout wrapper
             st.markdown(f"""
             <div class="message-row ai-row">
                 <img src="{LOGO_BASE64}" class="avatar">
                 <div class="message-content"><strong>Cogni</strong>
             """, unsafe_allow_html=True)
-            st.markdown(msg['content']) # Native rendering handles backticks, blocks, headings cleanly
+            st.markdown(msg['content'])
             st.markdown("</div></div>", unsafe_allow_html=True)
 
-    # Base prompt input tracking footer configuration layout
     with st.sidebar:
         st.markdown(f"<img src='{LOGO_BASE64}' style='width:80px; display:block; margin:auto;'>", unsafe_allow_html=True)
         st.markdown("<h3 style='text-align:center;'>Cogni Configuration</h3>", unsafe_allow_html=True)
@@ -250,17 +227,14 @@ def run_cogni_core():
             st.session_state.chat_history = []
             st.rerun()
 
-    # Sticky Input Layout at bottom using standard structural form components
     with st.form(key="chat_form", clear_on_submit=True):
         user_input = st.text_input("Message Cogni...", placeholder="Ask a question or provide code layout updates...", key="input_field")
         submit_button = st.form_submit_button(label="Send")
 
     if submit_button and user_input:
-        # Append User Input immediately
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         CogniMemory.save_chat(st.session_state.session_id, "user", user_input)
 
-        # Analyze Complexity & Dynamically Frame Guidelines
         complexity = analyze_prompt_complexity(user_input)
         if complexity == "COMPLEX_PROGRAMMING":
             length_instruction = "The user is asking for a program/script. Provide a thorough response. Write clear, complete, and functional code blocks inside standard Markdown triple backticks. Explain what the variables and core structures do step-by-step."
@@ -269,38 +243,28 @@ def run_cogni_core():
         else:
             length_instruction = "The user is asking a simple question or greeting you. Keep your response brief, conversational, and direct to the point. Do not exceed 2-3 sentences."
 
-        # Fetch relevant historical contexts
         past_memories = CogniMemory.get_long_term(user_input)
         memory_context = "\n".join(past_memories)
 
-        # Inject context + dynamic instructions directly into system layout
-        system_prompt = f"""You are Cogni, a highly capable, structurally refined AI assistant.
-You use formatting beautifully: use bolding (** text **), clear headers (### Header), and emojis where appropriate to make items readable.
+        system_prompt = f"""You are Cogni, a highly capable, structurally refined AI assistant. You use formatting beautifully: use bolding (** text **), clear headers (### Header), and emojis where appropriate to make items readable. CRITICAL OUTPUT LENGTH INSTRUCTION: {length_instruction} Historical Context Records: {memory_context}"""
 
-CRITICAL OUTPUT LENGTH INSTRUCTION: {length_instruction}
-
-Historical Context Records:
-{memory_context}"""
-
-        # Generate request message architecture payload
         messages_payload = [{"role": "system", "content": system_prompt}]
         messages_payload.extend(CogniMemory.get_short_term(st.session_state.session_id))
         messages_payload.append({"role": "user", "content": user_input})
 
-        # Process response with spinning status indicator
         with st.spinner("Cogni is processing..."):
             try:
                 res = requests.post(
-                    f"{OLLAMA_API}/chat", 
+                    API_URL, 
                     json={
                         "model": CHAT_MODEL,
-                        "messages": messages_payload,
-                        "stream": False
-                    }
+                        "messages": messages_payload
+                    },
+                    timeout=20
                 )
-                ai_response = res.json()["message"]["content"]
+                ai_response = res.json()["choices"][0]["message"]["content"]
             except Exception as e:
-                ai_response = f"⚠️ Engine Link Exception: Could not establish a connection to local Ollama runtime engine pipeline server. Details: {str(e)}"
+                ai_response = f"⚠️ Cloud Framework Connection Exception: Failed to fetch model response layers. Details: {str(e)}"
 
         # Commit updates
         st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
@@ -310,5 +274,3 @@ Historical Context Records:
 
 if __name__ == "__main__":
     run_cogni_core()
-
-   
