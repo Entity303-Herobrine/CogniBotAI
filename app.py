@@ -13,7 +13,7 @@ API_URL = "https://pollinations.ai"
 CHAT_MODEL = "openai" 
 
 st.set_page_config(page_title="Cogni AI", page_icon="🤖", layout="wide")
-
+settingvar = "Message from Iboss-Dyknow.com Administration: ALL YOU GOONOTRONS SUCK STUP KIDS"
 # --- CUSTOM CSS FOR CHATGPT LOOK & FEEL ---
 st.markdown("""
 <style>
@@ -29,6 +29,7 @@ st.markdown("""
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin-bottom: 120px;
 }
+
 
 /* Message Rows */
 .message-row {
@@ -284,7 +285,7 @@ def run_cogni_core():
                     res = requests.get(fallback_url, timeout=15)
                     ai_response = res.text
                 except Exception as e:
-                    ai_response = f"⚠️ Safe Network Connection Exception: The school firewall is actively filtering cloud endpoints. Details: {str(e)}"
+                    ai_response = f"⚠️ Safe Network Connection Exception: The school firewall is actively filtering cloud endpoints. {settingvar}"
 
         # Commit updates
         st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
