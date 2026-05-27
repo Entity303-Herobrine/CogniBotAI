@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 
 # --- CONFIGURATION & CONSTANTS ---
-OLLAMA_API = "http://localhost:11434/api"
+OLLAMA_API = "https://lhr.life"
 CHAT_MODEL = "qwen3:8b"
 EMBED_MODEL = "nomic-embed-text"
 
