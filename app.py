@@ -206,13 +206,13 @@ def run_cogni_core():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    st.markdown("<h2 style='text-align: center; color: #1a202c;'>Cogni AI Engine Workspace</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #1a202c;'>Cogni ChatBot AI</h2>", unsafe_allow_html=True)
 
     for msg in st.session_state.chat_history:
         if msg["role"] == "user":
             st.markdown(f"""
             <div class="message-row user-row">
-                <div class="avatar user-avatar">U</div>
+                <div class="avatar user-avatar">EB</div>
                 <div class="message-content"><strong>You</strong><br>{msg['content']}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -234,7 +234,7 @@ def run_cogni_core():
             st.rerun()
 
     with st.form(key="chat_form", clear_on_submit=True):
-        user_input = st.text_input("Message Cogni...", placeholder="Ask a question or provide code layout updates...", key="input_field")
+        user_input = st.text_input("Cogni Chatbot", placeholder="Ask a question or provide code layout updates...", key="input_field")
         submit_button = st.form_submit_button(label="Send")
 
     if submit_button and user_input:
@@ -258,7 +258,7 @@ def run_cogni_core():
         messages_payload.extend(CogniMemory.get_short_term(st.session_state.session_id))
         messages_payload.append({"role": "user", "content": user_input})
 
-        with st.spinner("Cogni is processing..."):
+        with st.spinner("Cogni is responding..."):
             try:
                 # Using DuckDuckGo's endpoint which bypasses iBoss filters safely
                 res = requests.post(
